@@ -1,0 +1,107 @@
+[
+  {
+    "published_file": "src/ecgweave/diagnosis/base_model.py",
+    "source": "定稿/model/frozen_code/base_model.py",
+    "original_sha256": "201d701bb62e6919d404b7fc9925566d3b224485f0fd2e698f7773bd7cd49361",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "3ce71ecae913f4fc0efaf5a575e598d26ec9359688a09c16dd15a9fca4321464"
+  },
+  {
+    "published_file": "src/ecgweave/diagnosis/pro_model.py",
+    "source": "定稿/model/frozen_code/pro_model.py",
+    "original_sha256": "325916bccb5eec5eed8dac4538f6ce720e66079e4b891158680bbc2edcf97d90",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "385a10333301c2f462162385c33325bc168b3a32465cf2485bf3303265b704df"
+  },
+  {
+    "published_file": "src/ecgweave/diagnosis/natural_reader.py",
+    "source": "定稿/model/frozen_code/natural_reader.py",
+    "original_sha256": "7bacc79f68ce12258812ae76d322ff5f04a2b1fb6dbe2041a49b0c1374c917d6",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "350f821481e882df86972a28e1fd20b4606be5be8d77b72f272b523a3e9ce623"
+  },
+  {
+    "published_file": "src/ecgweave/diagnosis/model.py",
+    "source": "定稿/model/frozen_code/model.py",
+    "original_sha256": "2c79b1017fd6fa28afccac5b6c1723be43464412394ff1a96e4409aa3d959bf1",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "170524b9faa8db2d0517602409b9570acc92a82608cf3115cf735fc773d75d23"
+  },
+  {
+    "published_file": "src/ecgweave/diagnosis/objective.py",
+    "source": "定稿/model/frozen_code/objective.py",
+    "original_sha256": "5159272d59f788ac328696e0eaeb9404e534a3671d454e6f7e951015da02f5ee",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "960a770fb4edc9aa219fe6ce0d33c90badba4d88a39a14d688efacdba4f0e5d5"
+  },
+  {
+    "published_file": "src/ecgweave/pretraining/core.py",
+    "source": "工作区/review-stage/ecg12_phase1_step1_260928/source/model.py",
+    "original_sha256": "4a3559982ea654630960e664014a7c53066d604db5b65d3bdb13b62118976084",
+    "adaptation": "原文复制",
+    "published_sha256": "4a3559982ea654630960e664014a7c53066d604db5b65d3bdb13b62118976084"
+  },
+  {
+    "published_file": "src/ecgweave/pretraining/model.py",
+    "source": "工作区/review-stage/ecg12_full_corpus_contract_260929/valid_model.py",
+    "original_sha256": "bbdf6016deb8a8cfe192520efced251667820cf1faa276975f7270a0ee71b1b6",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "b7848d7f5056aca24c12a564f19e72500c7929280401efa1c7b40f0163469988"
+  },
+  {
+    "published_file": "src/ecgweave/delineation/base.py",
+    "source": "工作区/review-stage/ecg12_gls_pattern_260930/source_snapshot/fixed_reference/source_snapshot/ecg12_phase1_step1_260928/downstream_source/finetune.py",
+    "original_sha256": "fc646f367464d281dfce62859af2e2273cbe696be16971970acc9a7da34f1224",
+    "adaptation": "抽取Segmenter12及其常量/辅助函数；standardize来自同快照ecguni/augment.py",
+    "published_sha256": "b04d87c338a62f14e88cb118cec12590c8b0efdfef2e95e191fb4f8ccd903dea"
+  },
+  {
+    "published_file": "src/ecgweave/delineation/model.py",
+    "source": "工作区/review-stage/ecg12_gls_pattern_260930/models.py",
+    "original_sha256": "ef1c195ff3d5f9429c12fcdf8e8002e229d23c547e69490a8e69bba3b7c48373",
+    "adaptation": "包内导入；工厂直接构造同结构，不隐式读取S*",
+    "published_sha256": "2add9db315b9c138d4d1f49e98e665e5b100f8135a2ce696ace5565e47e490e3"
+  },
+  {
+    "published_file": "src/ecgweave/delineation/pattern_mix.py",
+    "source": "工作区/review-stage/ecg12_gls_pattern_260930/pattern_mix.py",
+    "original_sha256": "a99409ca2a4c18ebad5e5ae139c0f06f42c65b0f39e0ddedf9ebcad2131a9ac5",
+    "adaptation": "原文复制",
+    "published_sha256": "a99409ca2a4c18ebad5e5ae139c0f06f42c65b0f39e0ddedf9ebcad2131a9ac5"
+  },
+  {
+    "published_file": "src/ecgweave/delineation/loss.py",
+    "source": "工作区/review-stage/ecg12_gls_pattern_260930/source_snapshot/fixed_reference/source_snapshot/ecg12_ssl_stage2_260929/train_ssl.py",
+    "original_sha256": "2c64a9a2f4bc56787daa5144b8c75e1a65c36ca441dfb83846b45deeef24099d",
+    "adaptation": "抽取原pseudo_ce；包内常量导入",
+    "published_sha256": "c89d571729a4b72bd1a15b34a93fd9d9b0e6d31fba6c80a203a1ee60ac599be4"
+  },
+  {
+    "published_file": "tests/test_diagnosis_math.py",
+    "source": "定稿/model/frozen_code/test_natural.py",
+    "original_sha256": "b564e062eec2a5cc9f2a6017048346f2f8983f586b7dc03d620da363d082c8e8",
+    "adaptation": "替换导入；主管集成测试另由公开接口测试覆盖",
+    "published_sha256": "4a25da838ec4d5869d57fcd1b3380420079d46c3a81cd7155751875f08ead3bc"
+  },
+  {
+    "published_file": "tests/test_diagnosis_objective.py",
+    "source": "定稿/model/frozen_code/test_objective.py",
+    "original_sha256": "19a3687be5dac1e18da97facf440721fc1e9e80ab1d5d7ae9354d0a197fc359d",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "69c78a94d82115b9eba95adedfe843fbf1db3686e65535cfc46ce5b8cd7d92b5"
+  },
+  {
+    "published_file": "tests/test_pattern_mix.py",
+    "source": "工作区/review-stage/ecg12_gls_pattern_260930/tests/test_pattern_mix.py",
+    "original_sha256": "b367ba2175346b2ab7c265c4ce468fe24b61989d9412d39981818bf83bd7b953",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "3eaf08fdb56ec0bbecd3b36c1a59f7c3fef87ad1c34d4952b47d096a91675d31"
+  },
+  {
+    "published_file": "tests/test_pretraining_support.py",
+    "source": "工作区/review-stage/ecg12_full_corpus_contract_260929/tests/test_valid_model.py",
+    "original_sha256": "82212d026b6b7df3d60619b5602379ece12d091078634428b9fd6c15e7beb514",
+    "adaptation": "包内相对导入；不改计算",
+    "published_sha256": "5efb4f8faca5578ba76ee40347fba1dd9fcb3a094807c3794b7c9225de4e646e"
+  }
+]

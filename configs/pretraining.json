@@ -1,0 +1,21 @@
+{
+  "seed": 0,
+  "steps": 100000,
+  "batch_size": 32,
+  "peak_lr": 0.0003,
+  "warmup_steps": 5000,
+  "mask_ratio": 0.75,
+  "mask_mode": "limbsync_mixed",
+  "loss": "local_softnorm",
+  "local_window_patches": 5,
+  "soft_floor_mv": 0.02,
+  "record_count": 1236202,
+  "sample_rate_hz": 500,
+  "seq_len": 5000,
+  "patch_size": 20,
+  "embed_dim": 192,
+  "depth": 12,
+  "heads": 3,
+  "decoder_embed_dim": 128,
+  "decoder_depth": 2
+}

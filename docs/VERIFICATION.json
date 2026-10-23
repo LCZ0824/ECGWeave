@@ -1,0 +1,155 @@
+{
+  "status": "passed",
+  "scope": "仅合成数据与可信本地权重，未读取患者资料或重跑模型性能",
+  "unit_and_integration_tests": {
+    "passed": 48,
+    "failed": 0
+  },
+  "static_checks": [
+    "ruff check",
+    "ruff format --check",
+    "python -m compileall -q src tests"
+  ],
+  "package_installation": {
+    "isolated_target": true,
+    "class_names": 71,
+    "parameters": 6889202
+  },
+  "cpu_full_shape": {
+    "device": "cpu",
+    "torch": "2.8.0+cu128",
+    "input_shape": [
+      1,
+      12,
+      5000
+    ],
+    "patient_data_read": false,
+    "optimizer_steps": 0,
+    "components": {
+      "pretraining": {
+        "parameters": 5770836,
+        "output_shape": [
+          1,
+          12,
+          250,
+          20
+        ],
+        "loss": 2.6131954193115234,
+        "seconds": 0.526311774738133,
+        "peak_allocated_mib": null
+      },
+      "delineation": {
+        "parameters": 5562452,
+        "output_shape": [
+          1,
+          4,
+          12,
+          5000
+        ],
+        "loss": 0.18378037214279175,
+        "seconds": 2.434961444232613,
+        "peak_allocated_mib": null
+      },
+      "diagnosis": {
+        "parameters": 6889202,
+        "output_shape": [
+          1,
+          71
+        ],
+        "loss": 0.08804169297218323,
+        "seconds": 3.433045060839504,
+        "peak_allocated_mib": null
+      }
+    },
+    "status": "passed"
+  },
+  "cuda_full_shape": {
+    "device": "cuda:1",
+    "torch": "2.8.0+cu128",
+    "input_shape": [
+      1,
+      12,
+      5000
+    ],
+    "patient_data_read": false,
+    "optimizer_steps": 0,
+    "components": {
+      "pretraining": {
+        "parameters": 5770836,
+        "output_shape": [
+          1,
+          12,
+          250,
+          20
+        ],
+        "loss": 2.883967876434326,
+        "seconds": 0.4245775630697608,
+        "peak_allocated_mib": 150.05615234375
+      },
+      "delineation": {
+        "parameters": 5562452,
+        "output_shape": [
+          1,
+          4,
+          12,
+          5000
+        ],
+        "loss": 0.20893336832523346,
+        "seconds": 0.30168684804812074,
+        "peak_allocated_mib": 506.4267578125
+      },
+      "diagnosis": {
+        "parameters": 6889202,
+        "output_shape": [
+          1,
+          71
+        ],
+        "loss": 0.045880913734436035,
+        "seconds": 0.14879317861050367,
+        "peak_allocated_mib": 1150.6494140625
+      }
+    },
+    "status": "passed"
+  },
+  "original_checkpoint_comparison": {
+    "patient_data_read": false,
+    "checkpoints": {
+      "diagnosis_checkpoint": {
+        "sha256": "041ba91518c238c1e661fba54390965ac6b3d5bc343a3d5b89c9877a09e240bc",
+        "matched_frozen_identity": true
+      },
+      "mae_initialization": {
+        "sha256": "4e6e63a2027b8a0b2477644f7ba42c79240def74e4fee2abad4217a1e37f8e2c",
+        "matched_frozen_identity": true
+      },
+      "delineation_checkpoint": {
+        "sha256": "982ca216154326a997205cc06380fe8c86b5672a0d83ec9307e06ba2ad797451",
+        "matched_frozen_identity": true
+      },
+      "delineation_teacher": {
+        "sha256": "91a760089648b0abb25311ba456d077490dbd8e8b74323ae39323b3929012743",
+        "matched_frozen_identity": true
+      }
+    },
+    "comparisons": {
+      "diagnosis_logits_max_abs_error": 0.0,
+      "delineation_logits_max_abs_error": 0.0
+    },
+    "raw_pipeline_output_shape": [
+      1,
+      71
+    ],
+    "mae_strict_load": true,
+    "cli_cached_max_abs_error": 9.5367431640625e-07,
+    "cli_cached_fp32_close": true,
+    "cli_raw_max_abs_error": 9.5367431640625e-07,
+    "cli_raw_fp32_close": true,
+    "status": "passed"
+  },
+  "cli_fp32_tolerance": {
+    "rtol": 1e-06,
+    "atol": 2e-06
+  },
+  "weights_published": false,
+  "data_published": false
+}

@@ -1,0 +1,20 @@
+{
+  "weights_included": false,
+  "checkpoints": {
+    "diagnosis_checkpoint": {
+      "sha256": "041ba91518c238c1e661fba54390965ac6b3d5bc343a3d5b89c9877a09e240bc"
+    },
+    "mae_initialization": {
+      "sha256": "4e6e63a2027b8a0b2477644f7ba42c79240def74e4fee2abad4217a1e37f8e2c"
+    },
+    "delineation_teacher": {
+      "sha256": "91a760089648b0abb25311ba456d077490dbd8e8b74323ae39323b3929012743"
+    },
+    "delineation_checkpoint": {
+      "sha256": "982ca216154326a997205cc06380fe8c86b5672a0d83ec9307e06ba2ad797451"
+    }
+  },
+  "diagnosis_parameters": 6889202,
+  "diagnosis_selected_step": 9262,
+  "class_order": "src/ecgweave/task_names71.json"
+}

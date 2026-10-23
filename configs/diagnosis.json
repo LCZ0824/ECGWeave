@@ -1,0 +1,60 @@
+{
+  "seed": 0,
+  "architecture": "ecg_gpt_pro_natural_261020",
+  "arm": "wide_joint",
+  "candidate_model": {
+    "fine_dim": 128,
+    "exchange_dim": 128,
+    "exchange_ffn": "channel",
+    "ffn_expansion": 2,
+    "ffn_layers": [
+      4,
+      8,
+      12
+    ],
+    "reader": "joint_feature_raw",
+    "label_self_attention": false,
+    "readout_precision": "global_AMP"
+  },
+  "reference_dropout": 0.0,
+  "train_records": 17418,
+  "validation_records": 2183,
+  "epochs": 12,
+  "batch_size": 32,
+  "microbatch": 16,
+  "bce_updates": 6540,
+  "bce_record_presentations": 209016,
+  "bce_warmup_updates": 545,
+  "rank_passes": 20,
+  "rank_classes": 8,
+  "rank_per_side": 4,
+  "rank_updates": 5444,
+  "rank_record_presentations": 348360,
+  "rank_warmup_updates": 273,
+  "rank_bce_coefficient": 0.1,
+  "scale_records": 2048,
+  "scale_floor": 0.25,
+  "clip_norm": 5.0,
+  "inference_batch_size": 16,
+  "checkpoint_interval": 128,
+  "progress_interval": 64,
+  "lr_floor": 0.1,
+  "optimizer": {
+    "bce_encoder_lr": 0.0001,
+    "bce_new_lr": 0.001,
+    "rank_encoder_lr": 1e-05,
+    "rank_new_lr": 0.0001,
+    "layer_decay": 0.75,
+    "weight_decay": 0.05,
+    "betas": [
+      0.9,
+      0.999
+    ],
+    "eps": 1e-08
+  },
+  "selection": "full-fold9-all71-macro-AUROC-max;earliest-tie;AP-same-weights",
+  "precision": "BF16-CUDA-autocast;FP32-parameters-loss-logits;TF32-off",
+  "initialization": "pure-MAE-F0-only;fresh-diagnostic;no-linear-probe",
+  "fixed_reference": true,
+  "test_read": false
+}

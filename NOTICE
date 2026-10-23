@@ -1,0 +1,11 @@
+ECGWeave
+Copyright 2026 ECGWeave contributors.
+
+本公开版由原冻结科研实现按模块整理。修改包括包内导入、显式检查点路径、
+合成检查与命令行封装；未修改原模型的参数定义或核心前向计算。
+
+项目训练框架与定界增强沿用或适配自VUNO SemiSegECG：
+https://github.com/vuno/semi-seg-ecg
+Copyright 2025 VUNO Inc.，Apache License 2.0。
+
+具体原文件、SHA256和本次适配范围见docs/SOURCE_PROVENANCE.json。

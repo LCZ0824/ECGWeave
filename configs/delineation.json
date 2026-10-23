@@ -1,0 +1,47 @@
+{
+  "architecture": "gls_local",
+  "classes": [
+    "BG",
+    "P",
+    "QRS",
+    "T"
+  ],
+  "sample_rate_hz": 500,
+  "seq_len": 5000,
+  "labeled_train_patients": 7,
+  "unlabeled_train_pool_patients": 120,
+  "validation_patients": 40,
+  "test_patients": 40,
+  "epochs": 100,
+  "updates_per_epoch": 60,
+  "batch_records": 2,
+  "teacher": "fixed_S_star",
+  "mixing": "bidirectional_pattern",
+  "confidence_threshold": 0.95,
+  "denominator": "valid",
+  "u2l_confidence_threshold": 0.8,
+  "warmup_epochs": 10,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "selection": "validation_mIoU_max;earliest_tie",
+  "recipe": {
+    "method": "v2_ecg",
+    "epochs": 100,
+    "pool_size": 120,
+    "eval_every": 10,
+    "u_batch": 2,
+    "lambda_u": 1.0,
+    "ramp_epochs": 10.0,
+    "threshold": 0.95,
+    "ema_decay": 0.99,
+    "gain_min": 0.8,
+    "gain_max": 1.2,
+    "noise_std_mv": 0.02,
+    "denominator": "valid",
+    "boundary_radius": 4
+  },
+  "teacher_update": "none; original S* parameters and all buffers frozen"
+}
