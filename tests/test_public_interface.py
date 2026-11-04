@@ -1,4 +1,4 @@
-"""公开封装的跨阶段合同；只用合成数据。"""
+"""Synthetic cross-stage integration tests."""
 
 from dataclasses import asdict
 import importlib.util
@@ -11,7 +11,7 @@ torch.set_num_threads(2)
 
 
 def api():
-    assert importlib.util.find_spec("ecgweave"), "缺少可安装的ECGWeave公开包"
+    assert importlib.util.find_spec("ecgweave"), "ECGWeave package is not installed"
     from ecgweave import pipeline
 
     return pipeline

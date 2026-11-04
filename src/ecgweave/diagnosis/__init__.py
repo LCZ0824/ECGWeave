@@ -1,1 +1,1 @@
-"""ECGWeave公开研究实现。"""
+"""ECGWeave model components."""

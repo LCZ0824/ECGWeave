@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""冻结 Step1 MAE 的有效支持适配；参数键兼容，不改变既有模型文件。"""
+"""Masked autoencoding with valid-sample support."""
 
 import torch
 from torch.nn import functional as F
@@ -11,32 +10,34 @@ LossConfig = core.LossConfig
 
 
 def expand_valid(valid, batch, leads, patches, device):
-    """接受时间 [B,K] 或导联 [B,L,K] 的完整 patch 有效性。"""
+    """Expand temporal [B, K] or per-lead [B, L, K] validity masks."""
     if valid is None:
         return torch.ones(batch, leads, patches, dtype=torch.bool, device=device)
     if valid.dtype != torch.bool:
-        raise ValueError("patch_valid 必须为 bool")
+        raise ValueError("patch_valid must be bool")
     if valid.shape == (batch, patches):
         valid = valid[:, None].expand(-1, leads, -1)
     if valid.shape != (batch, leads, patches):
-        raise ValueError("patch_valid 形状不匹配")
+        raise ValueError("patch_valid shape does not match")
     return valid.to(device)
 
 
 def make_valid_mask(patch_valid, mask_ratio, mode, generator=None, n_leads=12):
-    """在真实支持内沿用冻结遮挡配方；不为极短记录调低遮挡率。"""
+    """Apply the masking recipe within valid sample support."""
     if patch_valid.ndim not in (2, 3):
-        raise ValueError("patch_valid 需要 [B,K] 或 [B,L,K]")
+        raise ValueError("patch_valid must have shape [B, K] or [B, L, K]")
     b, k = patch_valid.shape[0], patch_valid.shape[-1]
     valid = expand_valid(patch_valid, b, n_leads, k, patch_valid.device)
-    # 同步十二导联支持是当前数据合同，避免导联缺失破坏组同步语义。
+    # Require shared time support for synchronized lead masking.
     if not torch.equal(valid, valid[:, :1].expand_as(valid)):
-        raise ValueError("当前配方要求全部导联共享有效时间支持")
+        raise ValueError("All leads must share valid time support")
     counts = valid[:, 0].sum(-1)
     for count in counts.tolist():
         keep = round(count * (1 - mask_ratio))
         if not 0 < keep < count:
-            raise ValueError("有效支持无法同时提供可见 patch 与被遮目标")
+            raise ValueError(
+                "Valid support cannot provide both visible and masked target patches"
+            )
     if bool(valid.all()):
         return core.make_mask(b, n_leads, k, mask_ratio, mode, generator, valid.device)
     result = torch.ones_like(valid)
@@ -49,7 +50,7 @@ def make_valid_mask(patch_valid, mask_ratio, mode, generator=None, n_leads=12):
 
 
 def attention_block(block, x, key_valid):
-    """复用冻结参数；SDPA bool True 表示允许作为 key。"""
+    """Apply attention using True key-mask entries as valid positions."""
     if bool(key_valid.all()):
         return block(x)
     b, length, width = x.shape
@@ -70,7 +71,7 @@ def attention_block(block, x, key_valid):
 
 
 def valid_target(patches, valid, config):
-    """完整有效 patch 的局部矩；padding 不参与任何目标统计。"""
+    """Compute local target moments from fully valid patches."""
     if bool(valid.all()):
         return core.reconstruction_target(patches, config)
     patches = torch.where(valid[..., None], patches.float(), 0.0)
@@ -84,7 +85,7 @@ def valid_target(patches, valid, config):
     centered = torch.where(valid[..., None], patches - mean, 0.0)
     b, leads, k, _ = patches.shape
     moments = torch.stack((centered.mean(-1), centered.square().mean(-1)), dim=2)
-    # 池化三个量的同一分母相消，得到有效 patch 数加权矩。
+    # Shared pooling denominators cancel in support-weighted moments.
     pooled = F.avg_pool1d(
         moments.reshape(b * leads, 2, k),
         config.local_window,
@@ -112,23 +113,23 @@ def valid_target(patches, valid, config):
 
 
 class ValidECGMAE(core.ECGMAE):
-    """固定 10 秒布局、可变可见数；state_dict 与冻结 ECGMAE 相同。"""
+    """Masked autoencoder supporting variable valid-token counts."""
 
     def forward(self, x, mask, patch_valid=None):
         c = self.config
         b = x.shape[0]
         valid = expand_valid(patch_valid, b, c.n_leads, c.n_patches, x.device)
         if mask.dtype != torch.bool or mask.shape != valid.shape:
-            raise ValueError("mask 需要匹配输入的 bool [B,L,K]")
+            raise ValueError("mask must be bool [B, L, K] matching the input")
         if not valid.any(-1).all():
-            raise ValueError("每导联必须存在有效 patch")
+            raise ValueError("Each lead must have a valid patch")
         visible = (valid & ~mask).flatten(1)
         counts = visible.sum(-1)
         if (counts == 0).any():
-            raise ValueError("每条记录须有可见 token")
+            raise ValueError("Each record must have visible tokens")
         safe = torch.where(valid[..., None], self.patchify(x), 0.0)
         tokens = self._embed(self.unpatchify(safe))
-        # padding gather 槽独立 key mask；scatter 只写真实可见位置。
+        # Mask padded gather slots and scatter only valid visible positions.
         width = int(counts.max())
         indices = torch.zeros(b, width, dtype=torch.long, device=x.device)
         key_valid = torch.arange(width, device=x.device)[None] < counts[:, None]
@@ -167,11 +168,13 @@ class ValidECGMAE(core.ECGMAE):
             or mask.shape != valid.shape
             or mask.dtype != torch.bool
         ):
-            raise ValueError("预测/目标/遮挡形状或类型不匹配")
+            raise ValueError(
+                "Prediction, target, or mask shape or dtype does not match"
+            )
         targets = valid & mask
         counts = targets.sum((1, 2))
         if (counts == 0).any():
-            raise ValueError("每条记录必须有有效被遮目标")
+            raise ValueError("Each record must have valid masked targets")
         target = valid_target(patches, valid, config or LossConfig("raw"))
         error = (pred.float() - target).square().mean(-1)
         return (torch.where(targets, error, 0.0).sum((1, 2)) / counts).mean()

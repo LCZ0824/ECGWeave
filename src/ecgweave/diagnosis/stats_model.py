@@ -1,4 +1,4 @@
-"""当前论文stats_prior20分类器。"""
+"""ECGWeave classifier with attention-conditioned variance."""
 
 import torch
 from torch import nn
@@ -8,7 +8,7 @@ from .stats_reader import StatsInteractionReader
 
 
 class PostFFNOnly(nn.Module):
-    """保留交换后的FFN及其参数名称。"""
+    """Retain the post-exchange FFN without additional lead attention."""
 
     def __init__(self, post_ffn):
         super().__init__()
@@ -19,7 +19,7 @@ class PostFFNOnly(nn.Module):
 
 
 def build_classifier(config=None):
-    """完整构造共同骨干后替换读取器，与冻结训练实现的初始化一致。"""
+    """Construct the backbone, statistical reader, and class-specific heads."""
     config = ModelConfig() if config is None else config
     model = JointMultiresClassifier(config, arm="wide_joint")
     original_weight = model.classifier_weight
@@ -35,7 +35,7 @@ def build_classifier(config=None):
             }
             or loaded.unexpected_keys
         ):
-            raise ValueError("统计读取器的共同参数不匹配")
+            raise ValueError("Shared statistical-reader parameters do not match")
         model.classifier_weight = nn.Parameter(
             original_weight.detach()[:, : config.readout_dim].clone()
         )

@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""检验宏类别条件风险、记录预算和同分选择，不依赖患者数据。"""
+"""Class-conditional risk and sampling-budget tests."""
 
 import numpy as np
 import pytest
@@ -56,7 +55,7 @@ def test_rank_depends_on_order_and_gradient_pushes_positive_up():
 
 
 def test_importance_weighted_bce_matches_population_exactly():
-    # 条件批各取两个阳/阴；总体阳性率1/4，各条件内部取值恒定。
+    # Use balanced conditional groups with population prevalence 1/4.
     logits = torch.cat([torch.full((2, 71), 2.0), torch.full((2, 71), -1.0)])
     labels = torch.cat([torch.ones(2, 71), torch.zeros(2, 71)])
     _, corrected = class_objective(logits, labels, 0, torch.ones(71), 0.25, 2)

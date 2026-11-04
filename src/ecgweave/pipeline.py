@@ -1,4 +1,4 @@
-"""原始mV波形、固定软参考与最终分类器的公开接口。"""
+"""Waveform preprocessing, soft references, and checkpoint loading."""
 
 import numpy as np
 from scipy.signal import butter, sosfiltfilt
@@ -14,21 +14,21 @@ STATE_ORDER = ("BG", "P", "QRS", "T")
 
 
 def validate_signals(signals):
-    """公开输入为500Hz、10秒、float32原始mV；不隐式缩放或重采样。"""
+    """Require finite float32 [B, 12, 5000] signals at 500 Hz in mV."""
     if signals.ndim != 3 or signals.shape[1:] != (12, 5000) or len(signals) < 1:
-        raise ValueError("signals须为非空[B,12,5000]，导联顺序见LEAD_ORDER")
+        raise ValueError("signals must be nonempty [B, 12, 5000]; see LEAD_ORDER")
     if signals.dtype != torch.float32 or not torch.isfinite(signals).all():
-        raise ValueError("signals须为有限float32原始mV")
+        raise ValueError("signals must be finite float32 waveforms in mV")
 
 
 def load_classifier(checkpoint, device="cpu"):
-    """仅加载可信本地检查点；兼容原训练字典，不读取F0或患者缓存。"""
+    """Load a trusted local classifier checkpoint."""
     saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
     config = ModelConfig(**saved["model_config"])
     settings = saved["config"]
     if settings.get("structure") == "performance_composite":
         if settings["reader_kind"] != "stats" or not settings["lead_attention_off"]:
-            raise ValueError("当前入口只支持stats_prior20结构")
+            raise ValueError("This entry point supports the stats_prior20 structure")
         model = build_classifier(config)
     else:
         model = JointMultiresClassifier(config, arm=settings["arm"])
@@ -37,7 +37,7 @@ def load_classifier(checkpoint, device="cpu"):
 
 
 def load_delineator(checkpoint, device="cpu"):
-    """严格加载最终gls_local定界器的纯state_dict，不读取S*或F0。"""
+    """Strictly load a delineator state_dict and freeze its parameters."""
     model = build_segmenter()
     state = torch.load(checkpoint, map_location="cpu", weights_only=True)
     model.load_state_dict(state, strict=True)
@@ -45,14 +45,18 @@ def load_delineator(checkpoint, device="cpu"):
 
 
 def pool_reference(probabilities, signals, sample_support=None, patch_size=20):
-    """完整20点支持取概率均值；常数导联及无效格置零，输出[B,L,K,4]。"""
+    """Average valid 20-sample probability windows into [B, L, K, 4] references."""
     batch, leads, length = signals.shape
     if length % patch_size or probabilities.shape != (batch, 4, leads, length):
-        raise ValueError("四态概率须对齐[B,4,L,T]，T可被patch_size整除")
+        raise ValueError(
+            "Probabilities must align with [B, 4, L, T], with T divisible by patch_size"
+        )
     support = torch.ones_like(signals, dtype=torch.bool)
     if sample_support is not None:
         if sample_support.shape != signals.shape or sample_support.dtype != torch.bool:
-            raise ValueError("sample_support须为与signals同形的bool")
+            raise ValueError(
+                "sample_support must be bool with the same shape as signals"
+            )
         support = sample_support
     support = support & (signals.amax(-1) > signals.amin(-1))[..., None]
     shape = (batch, leads, length // patch_size, patch_size)
@@ -66,7 +70,7 @@ def pool_reference(probabilities, signals, sample_support=None, patch_size=20):
 
 
 def filter500(signals):
-    """定界器使用的500Hz滤波；分类器仍读取原始mV。"""
+    """Filter the delineator input while preserving raw classifier waveforms."""
     high = butter(5, 0.67, btype="highpass", fs=500, output="sos")
     low = butter(5, 40, btype="lowpass", fs=500, output="sos")
     return sosfiltfilt(low, sosfiltfilt(high, signals)).astype(np.float32)
@@ -74,16 +78,18 @@ def filter500(signals):
 
 @torch.inference_mode()
 def waveform_batch(signals, delineator, sample_support=None):
-    """以固定定界器一次前向生成对齐软参考；不读取记录级标签。"""
+    """Generate soft references with a frozen delineator."""
     validate_signals(signals)
     if delineator.training or any(p.requires_grad for p in delineator.parameters()):
-        raise ValueError("生成参考前须将定界器置eval并requires_grad_(False)")
+        raise ValueError(
+            "The delineator must be in eval mode with requires_grad_(False)"
+        )
     filtered = torch.from_numpy(filter500(signals.detach().cpu().numpy())).to(
         signals.device
     )
     probabilities = delineator(filtered).float().softmax(1)
     reference, support = pool_reference(probabilities, signals, sample_support)
-    # 与冻结前端相同：后验以float16保存，再恢复float32并归一化。
+    # Quantize posteriors to float16, then restore FP32 and normalize.
     reference = reference.half().float()
     reference = reference / reference.sum(-1, keepdim=True).clamp_min(1e-12)
     return {"signals": signals, "reference": reference, "reference_support": support}

@@ -1,4 +1,4 @@
-"""NPZ推理入口；使用者自行提供获授权的输入与可信权重。"""
+"""Run ECGWeave inference on NPZ inputs."""
 
 import argparse
 from importlib.resources import files
@@ -22,22 +22,22 @@ def main(argv=None):
     parser.add_argument("--precision", choices=("fp32", "bf16"), default="fp32")
     args = parser.parse_args(argv)
     if args.precision == "bf16" and torch.device(args.device).type != "cuda":
-        parser.error("--precision bf16仅用于CUDA")
+        parser.error("--precision bf16 requires CUDA")
     if args.batch_size < 1:
-        parser.error("--batch-size须为正整数")
+        parser.error("--batch-size must be positive")
     if args.output.exists():
-        raise FileExistsError(f"输出已存在：{args.output}")
+        raise FileExistsError(f"Output already exists: {args.output}")
     model = load_classifier(args.checkpoint, args.device)
     names = json.loads(files("ecgweave").joinpath("task_names71.json").read_text())
     if model.config.n_classes != len(names):
-        raise ValueError("此入口固定使用71类模型及已登记顺序")
+        raise ValueError("This entry point requires the registered 71-class model")
     with np.load(args.input, allow_pickle=False) as source:
         signals = torch.from_numpy(source["signals"])
         validate_signals(signals)
         cached = "reference" in source and "reference_support" in source
         if not cached and args.delineator is None:
             parser.error(
-                "原波形输入须提供--delineator，或提供对齐reference/reference_support"
+                "Provide --delineator for raw input or aligned reference/reference_support arrays"
             )
         reference = torch.from_numpy(source["reference"]) if cached else None
         support = torch.from_numpy(source["reference_support"]) if cached else None
@@ -53,7 +53,7 @@ def main(argv=None):
         or support.dtype != torch.bool
     ):
         raise ValueError(
-            "reference须float32[B,12,250,4]；reference_support须bool[B,12,250]"
+            "reference must be float32 [B, 12, 250, 4]; reference_support must be bool [B, 12, 250]"
         )
     delineator = load_delineator(args.delineator, args.device) if not cached else None
     outputs = []
@@ -91,7 +91,7 @@ def main(argv=None):
             probabilities=logits.sigmoid().numpy(),
             task_names=np.asarray(names),
         )
-    print(f"已保存{len(logits)}条记录的71类研究输出：{args.output}")
+    print(f"Saved {len(logits)} records with 71-class outputs to {args.output}")
 
 
 if __name__ == "__main__":

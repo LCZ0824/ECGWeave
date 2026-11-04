@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""CPU 行为测试：固定张量中的真实支持与冻结配方兼容。"""
+"""Valid-support masking and reconstruction tests."""
 
 import pytest
 import torch
@@ -100,9 +99,9 @@ def test_tiny_valid_and_impossible_masks():
         net.loss(net(x, mask, valid), x, mask, m.LossConfig("local_softnorm"), valid)
     )
     one = torch.arange(250)[None] < 1
-    with pytest.raises(ValueError, match="可见|目标"):
+    with pytest.raises(ValueError, match="visible|target"):
         m.make_valid_mask(one, 0.75, "limbsync_mixed", torch.Generator())
-    with pytest.raises(ValueError, match="目标"):
+    with pytest.raises(ValueError, match="target"):
         net.loss(
             torch.zeros(1, 12, 250, 20),
             x,

@@ -1,4 +1,4 @@
-"""同步导联的原始供体双向 Pattern 搬运；不读取 U 真值。"""
+"""Lead-synchronized bidirectional pattern mixing."""
 
 from __future__ import annotations
 
@@ -12,31 +12,31 @@ THRESHOLD = 0.8
 
 
 def best_match(query, donors, starts, *, query_valid=None, donor_valid=None):
-    """在共同有效的 0..3 标签上计算四类宏 IoU，双空类记 0。
+    """Find the highest macro-IoU donor window over common valid labels.
 
-    一个候选同时覆盖全部导联。并列按供体行、起点升序决定；完全无
-    共同有效点时返回 None，而非把零支持误当背景匹配。
-    """
+    Ties follow donor row and start order. Return None for empty common support."""
     query, donors = np.asarray(query), np.asarray(donors)
     if query.ndim != 2 or donors.ndim != 3 or donors.shape[1] != query.shape[0]:
-        raise ValueError("匹配要求 query[L,W] 与 donors[N,L,T]")
+        raise ValueError("Matching requires query [L, W] and donors [N, L, T]")
     width = query.shape[-1]
     starts = np.unique(np.asarray(starts, dtype=np.int64))
     if starts.ndim != 1 or width < 1:
-        raise ValueError("窗口宽度须为正，候选起点须为一维")
+        raise ValueError(
+            "Window width must be positive and candidate starts one-dimensional"
+        )
     if np.any(starts < 0) or np.any(starts + width > donors.shape[-1]):
-        raise ValueError("候选窗口超出供体时间范围")
+        raise ValueError("Candidate window exceeds the donor time range")
     q_valid = (query >= 0) & (query < 4)
     d_valid = (donors >= 0) & (donors < 4)
     if query_valid is not None:
         query_valid = np.asarray(query_valid, dtype=bool)
         if query_valid.shape != query.shape:
-            raise ValueError("query_valid 须与 query 同形")
+            raise ValueError("query_valid must match query shape")
         q_valid &= query_valid
     if donor_valid is not None:
         donor_valid = np.asarray(donor_valid, dtype=bool)
         if donor_valid.shape != donors.shape:
-            raise ValueError("donor_valid 须与 donors 同形")
+            raise ValueError("donor_valid must match donors shape")
         d_valid &= donor_valid
     if not len(starts) or not len(donors):
         return None
@@ -92,15 +92,15 @@ def mix_batches(
     seams_l=None,
     seams_u=None,
 ):
-    """同批双向搬运同步导联窗口，两个方向均只读取原始输入。
+    """Mix synchronized windows from the original labeled and unlabeled batches.
 
-    L2U 已知人工标签映射为 one-hot/conf=1；未知位置 q/conf=0、
-    valid=False、target=-100。U2L 的窗口置信度仅在原供体有效点计算，
-    FP64 累计且严格大于 FP32 阈值；原目的人工 ignore 永远保留。
-    seams 只标内域切口，导数模型自行决定扩张范围。
-    """
+    L2U maps known labels to one-hot targets and marks unknown positions invalid.
+    U2L accepts donor windows above the confidence threshold and preserves
+    ignored destination labels. Seam masks mark interior cuts only."""
     if x_l.ndim != 3:
-        raise ValueError("混合要求非空 [B,L,T] 波形，T至少500")
+        raise ValueError(
+            "Mixing requires nonempty [B, L, T] waveforms with at least 500 samples"
+        )
     length = x_l.shape[-1]
     if (
         length < MIN_WIDTH
@@ -114,18 +114,22 @@ def mix_batches(
         or probabilities.shape != (len(weak_u), 4, *x_l.shape[1:])
         or valid_u.shape != weak_u.shape
     ):
-        raise ValueError("混合要求非空 [B,L,T] 与 [B,4,L,T]，T至少500")
+        raise ValueError(
+            "Mixing requires nonempty [B, L, T] and [B, 4, L, T] inputs with at least 500 samples"
+        )
     if (
         y_l.dtype != torch.long
         or valid_u.dtype != torch.bool
         or any(t.dtype != torch.float32 for t in (x_l, weak_u, strong_u, probabilities))
     ):
-        raise ValueError("L 标签为 long，U 有效性为 bool，波形与概率为 FP32")
+        raise ValueError(
+            "Labels must be long, validity bool, and waveforms and probabilities float32"
+        )
     if (
         len({t.device for t in (x_l, y_l, weak_u, strong_u, probabilities, valid_u)})
         != 1
     ):
-        raise ValueError("所有输入须位于同一设备")
+        raise ValueError("All inputs must be on the same device")
 
     seams_l = torch.zeros_like(y_l, dtype=torch.bool) if seams_l is None else seams_l
     seams_u = torch.zeros_like(valid_u) if seams_u is None else seams_u
@@ -142,7 +146,7 @@ def mix_batches(
     width = int(rng.integers(MIN_WIDTH, min(MAX_WIDTH, length) + 1))
     stride = width // 2
     starts = list(range(0, length - width + 1, stride))
-    # 先抽 L 位置，再抽 U 位置；不消费 NumPy/PyTorch 全局随机流。
+    # Sample labeled starts before unlabeled starts using a local generator.
     l_starts = rng.integers(0, length - width + 1, size=len(x_l))
     u_starts = rng.integers(0, length - width + 1, size=len(weak_u))
     output = {
@@ -259,12 +263,12 @@ def mix_batches(
         "threshold": float(threshold),
         "threshold_fp32": float(threshold_fp32),
         "u2l_mean_accumulator": "float64",
-        "u2l_mean_support": "所选原 U 供体片段的有效导联×时间点",
+        "u2l_mean_support": "Valid lead-time positions in the selected original unlabeled donor window",
         "empty_union_iou": 0,
-        "common_support_iou": "query/donor 均有效且标签在0..3；合并导联×时间计四类宏IoU",
-        "no_common_support": "不匹配、不搬运、不产生切口",
+        "common_support_iou": "Four-state macro IoU over common valid lead-time positions",
+        "no_common_support": "No matching, transfer, or seams",
         "ignore_label": -100,
-        "ignore_contract": "L2U未知人工标签置q/conf=0且valid=False；U2L保留原目的ignore，供体无效亦ignore",
+        "ignore_contract": "L2U invalidates unknown labels; U2L preserves destination and donor ignore masks",
         "l2u_acceptance_fraction": accepted_u / len(weak_u),
         "u2l_acceptance_fraction": accepted_l / len(x_l),
         "l2u_copied_true_l_by_class": copied_true.tolist(),
@@ -275,7 +279,7 @@ def mix_batches(
         "human_label_fraction_l": int((original_true - removed_true).sum())
         / y_l.numel(),
         "human_label_fraction_u": int(copied_true.sum()) / pseudo.numel(),
-        "cut_scope": "原供体填充边界随波形搬运，追加内域start/start+width；不扩张邻域",
-        "time_scope": "500Hz增强后的采样网格；不一概对应原患者未增强生理时间",
+        "cut_scope": "Transfer donor padding boundaries and mark interior window cuts",
+        "time_scope": "Augmented 500-Hz sampling grid",
     }
     return output

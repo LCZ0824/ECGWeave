@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""统一精度的联合读取，以及只从内容记忆解码的两轮类别读取。"""
+"""Class queries over multiscale waveform and voltage memory."""
 
 import torch
 from torch import nn
@@ -10,7 +9,7 @@ from . import pro_model as pro
 
 
 def joint_coverage_read(q, k, v, raw_values, types, scale_logits, durations):
-    """一次寻址同时汇聚学习特征与原波，继承调用处的普通AMP策略。"""
+    """Aggregate learned features and raw voltages with shared attention."""
     physical = raw_values.to(v.dtype)[:, None].expand(-1, v.shape[1], -1, -1)
     context = base.coverage_attention(
         q, k, torch.cat((v, physical), -1), types, scale_logits, durations
@@ -25,7 +24,7 @@ def split_heads(value, heads):
 
 
 class JointInteractionReader(pro.InteractionReader):
-    """保留原交互内容；第二轮合并Value，不再另算FP32原波注意力。"""
+    """Class-query reader with feature-voltage interactions."""
 
     def memory(self, h, u, raw):
         coarse_keys = self.coarse_key(h)
@@ -89,7 +88,7 @@ class JointInteractionReader(pro.InteractionReader):
 
 
 class LabelSelfAttention(nn.Module):
-    """病例条件的类别状态交流；无标签输入、无类别互斥softmax。"""
+    """Exchange ECG-conditioned evidence among class states."""
 
     def __init__(self, width, heads):
         super().__init__()
@@ -114,7 +113,7 @@ class LabelSelfAttention(nn.Module):
 
 
 class ContentMemoryReader(nn.Module):
-    """原波与细流只有一个内容入口；最终分类只读取类别状态。"""
+    """Decode class states from a shared waveform-content memory."""
 
     def __init__(self, config, label_self_attention=False):
         super().__init__()
@@ -126,7 +125,7 @@ class ContentMemoryReader(nn.Module):
             nn.LayerNorm(config.embed_dim), nn.Linear(config.embed_dim, width)
         )
         self.fine_norm = nn.LayerNorm(config.fine_dim)
-        # 只归一化学习特征，raw4保留全数据固定的mV单位。
+        # Normalize learned features; retain raw samples in mV.
         self.fine_content = nn.Sequential(
             nn.Linear(config.fine_dim + 4, width), nn.GELU(), nn.Linear(width, width)
         )
@@ -153,7 +152,7 @@ class ContentMemoryReader(nn.Module):
                 )
             ),
         )
-        # 分支初始化不推进共有部分的随机数流，clean与decoder的共有初值一致。
+        # Preserve shared initialization across reader variants.
         with torch.random.fork_rng(devices=[]):
             self.self_attention = nn.ModuleList(
                 LabelSelfAttention(width, config.readout_heads)
@@ -196,7 +195,7 @@ class ContentMemoryReader(nn.Module):
                 context.transpose(1, 2).reshape(batch, c.n_classes, c.readout_dim)
             )
             if self.self_attention:
-                # 首次cross-attention之后才交流，输入已含本例ECG证据。
+                # Exchange class evidence after the first cross-attention round.
                 query = self.self_attention[index](query)
             query = query + layer.ffn(query)
         return self.norm(query)

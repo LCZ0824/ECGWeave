@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""联合导联 Pattern 的来源、支持域及确定性合同。"""
+"""Pattern selection, support, and determinism tests."""
 
 from __future__ import annotations
 
@@ -118,7 +117,7 @@ def test_original_padding_seams_follow_original_donors():
 
 
 def _reference_match(query, donors, starts, query_valid, donor_valid):
-    """独立按候选逐项核验，不调用模块搜索函数。"""
+    """Independent exhaustive donor-window reference implementation."""
     best = None
     for row in range(len(donors)):
         for start in sorted(starts):
@@ -385,5 +384,5 @@ def test_legacy_threshold_argument_controls_u2l_acceptance():
 
 
 def test_mix_rejects_waveform_shorter_than_500():
-    with pytest.raises(ValueError, match="至少500"):
+    with pytest.raises(ValueError, match="at least 500"):
         _pattern().mix_batches(**_inputs(length=499), seed=1)

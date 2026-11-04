@@ -1,4 +1,4 @@
-"""当前论文模型的结构、目标与前端；仅使用合成数据。"""
+"""Classifier identity, checkpoint loading, and preprocessing tests."""
 
 from dataclasses import asdict
 import math

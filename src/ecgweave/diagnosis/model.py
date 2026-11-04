@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""四个性能候选：宽细流与交换、逐次FFN、统一内容读出及类别解码。"""
+"""Backbone variants with cross-scale exchange and class queries."""
 
 from dataclasses import dataclass
 
@@ -20,7 +19,7 @@ class ModelConfig(base.ModelConfig):
 
 
 class FineFFN(nn.Module):
-    """交换后的逐位置重编码；单一零输出初始化，残差系数为1。"""
+    """Positionwise post-exchange residual MLP with zero-initialized output."""
 
     def __init__(self, width):
         super().__init__()
@@ -35,7 +34,7 @@ class FineFFN(nn.Module):
 
 
 class TemporalFineFFN(FineFFN):
-    """沿每条导联的真实时间轴混合隐藏特征，保持采样网格与导联边界。"""
+    """Temporal mixing within each lead on its original sampling grid."""
 
     def __init__(self, width, dilation):
         super().__init__(width)
@@ -76,10 +75,10 @@ class ExchangeLeadAttention(base.SameTimeLeadAttention):
 class JointMultiresClassifier(pro.JointMultiresClassifier):
     def __init__(self, config, arm="wide_joint"):
         if arm not in SUPPORTED_ARMS:
-            raise ValueError(f"未知实验臂：{arm}")
+            raise ValueError(f"Unknown backbone variant: {arm}")
         super().__init__(config, "gpt_pro")
         self.arm = arm
-        # 共同骨干先完整初始化，再增加分支，避免候选改变其他共有初值。
+        # Initialize the shared backbone before adding variant-specific branches.
         for index, exchange in enumerate(self.exchanges):
             attention = ExchangeLeadAttention(
                 config, 2**index if arm == "temporal_joint" else None
@@ -90,7 +89,9 @@ class JointMultiresClassifier(pro.JointMultiresClassifier):
             if loaded.unexpected_keys or any(
                 not name.startswith("post_ffn.") for name in loaded.missing_keys
             ):
-                raise ValueError("交换后FFN未保留共有导联注意力")
+                raise ValueError(
+                    "Post-exchange FFN initialization changed shared lead-attention parameters"
+                )
             exchange.lead_attention = attention
         if arm in ("wide_clean", "label_decoder"):
             self.reader = ContentMemoryReader(

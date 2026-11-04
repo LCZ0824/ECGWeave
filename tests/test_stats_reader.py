@@ -1,4 +1,4 @@
-"""统计读取器的数学、初始化与梯度；仅使用合成数据。"""
+"""Attention-moment readout and gradient tests."""
 
 import math
 

@@ -1,4 +1,4 @@
-"""完整自然分布BCE与固定系数的成对/先验对齐宏辅助。"""
+"""Prevalence-weighted BCE and fixed-prior auxiliary objectives."""
 
 from contextlib import nullcontext
 import math
@@ -9,11 +9,13 @@ from torch.nn import functional as F
 
 
 def mixed_batch(uniform_rows, sampler, prevalence):
-    """32条为16均匀+2组4正4负；10条尾批为2均匀+1组4正4负。"""
+    """Use 16 uniform records and two four-positive/four-negative groups per batch."""
     uniform_rows = np.asarray(uniform_rows, dtype=np.int64)
     layout = {32: (16, 2, 4), 10: (2, 1, 4), 2: (0, 1, 1)}
     if len(uniform_rows) not in layout:
-        raise ValueError("仅接受32条完整批、10条尾批或2条CPU预检批")
+        raise ValueError(
+            "Expected a 32-record full batch, 10-record final batch, or two-record smoke batch"
+        )
     start, classes, side = layout[len(uniform_rows)]
     pieces, conditions = [uniform_rows[:start]], []
     for task, rows in sampler.draw(classes=classes, per_side=side):
@@ -31,15 +33,16 @@ def mixed_batch(uniform_rows, sampler, prevalence):
 
 
 def loss_components(logits, labels, conditions, objective, records, start=0):
-    """返回本微批对完整更新的BCE和辅助贡献；start是全局记录偏移。
+    """Return microbatch contributions to the full-update BCE and auxiliary loss.
 
-    records与conditions均指完整更新。BCE除完整记录数，辅助除完整
-    条件组数，因此对多个微批的结果直接相加即可还原完整风险。
-    """
+    records and conditions describe the full update; start is the record offset.
+    Summing the returned contributions recovers the full-update objective."""
     if logits.shape != labels.shape or logits.shape[1] != 71 or not conditions:
-        raise ValueError("损失要求完整71列同形标签和非空条件组")
+        raise ValueError(
+            "Loss requires matching 71-column labels and nonempty conditional groups"
+        )
     weights = logits.new_ones(len(logits))
-    # 均匀记录微批也保留可求导的零，供分项autograd校准使用。
+    # Keep a differentiable zero for uniform-only microbatches.
     auxiliary = logits.sum() * 0
     end = start + len(logits)
     for condition in conditions:
@@ -47,7 +50,9 @@ def loss_components(logits, labels, conditions, objective, records, start=0):
         last = first + 2 * side
         if first < end and last > start:
             if not start <= first < last <= end:
-                raise ValueError("完整正负条件组禁止跨越微批边界")
+                raise ValueError(
+                    "Conditional groups must not cross microbatch boundaries"
+                )
             offset, task, prevalence = (
                 first - start,
                 condition["task"],
@@ -66,14 +71,14 @@ def loss_components(logits, labels, conditions, objective, records, start=0):
                     + F.softplus(negative - bias).mean()
                 )
             else:
-                raise ValueError("辅助目标必须为pair或prior")
+                raise ValueError("Auxiliary objective must be pair or prior")
             auxiliary = auxiliary + value / len(conditions)
     bce = F.binary_cross_entropy_with_logits(logits, labels, reduction="none").mean(1)
     return (bce * weights).sum() / records, auxiliary
 
 
 def update(model, optimizer, batch, conditions, config, device, scale=None):
-    """单优化器微批梯度累加；scale仅兼容旧驱动接口，不读取或更新。"""
+    """Accumulate microbatch gradients with one optimizer; scale is unused."""
     model.train()
     optimizer.zero_grad(set_to_none=True)
     records = len(batch["labels"])
@@ -99,7 +104,7 @@ def update(model, optimizer, batch, conditions, config, device, scale=None):
         )
         loss = bce + coefficient * aux
         if not torch.isfinite(loss):
-            raise FloatingPointError("性能组合损失非有限")
+            raise FloatingPointError("Combined loss is not finite")
         loss.backward()
         total += float(loss.detach())
         classification += float(bce.detach())

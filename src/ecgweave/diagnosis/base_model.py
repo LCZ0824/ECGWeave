@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""持续细网格与纯MAE共同编码；固定四态提供有界低秩关系提示。"""
+"""Coarse and fine waveform encoding with soft-reference attention."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -35,9 +34,11 @@ class ModelConfig:
     def __post_init__(self):
         object.__setattr__(self, "exchange_layers", tuple(self.exchange_layers))
         if min(self.n_leads, self.seq_len, self.patch_size, self.n_classes) < 1:
-            raise ValueError("导联、样点、patch和类别数必须为正")
+            raise ValueError("Lead, sample, patch, and class counts must be positive")
         if self.seq_len % self.patch_size or self.patch_size % 4:
-            raise ValueError("序列必须整除patch，patch必须包含整数个4点细格")
+            raise ValueError(
+                "Sequence length must be divisible by patch size, and patch size by four"
+            )
         for width, heads in (
             (self.embed_dim, self.num_heads),
             (self.fine_dim, self.fine_heads),
@@ -45,20 +46,28 @@ class ModelConfig:
             (self.readout_dim, self.readout_heads),
         ):
             if width < 2 or width % 2 or heads < 1 or width % heads:
-                raise ValueError("特征宽度必须为正偶数，且可被对应头数整除")
+                raise ValueError(
+                    "Feature widths must be positive, even, and divisible by their head counts"
+                )
         if self.depth < 3 or self.mlp_ratio <= 0 or self.sample_rate <= 0:
-            raise ValueError("编码器至少三层，MLP比例和采样率必须为正")
+            raise ValueError(
+                "Encoder depth must be at least three; MLP ratio and sample rate must be positive"
+            )
         if (
             len(self.exchange_layers) != 3
             or tuple(sorted(set(self.exchange_layers))) != self.exchange_layers
             or self.exchange_layers[0] < 1
             or self.exchange_layers[-1] != self.depth
         ):
-            raise ValueError("三次交换必须严格递增，并以编码器最后一层结束")
+            raise ValueError(
+                "Exchange layers must increase strictly and end at the final encoder layer"
+            )
         if not 1 <= self.relation_start_layer <= self.depth:
-            raise ValueError("参考关系起始层必须位于编码器内")
+            raise ValueError("Reference start layer must be within the encoder")
         if self.beta_max != 1.0 or self.residual_init != 0.1:
-            raise ValueError("本候选固定beta_max=1和新增残差初值0.1")
+            raise ValueError(
+                "This configuration requires beta_max=1 and residual_init=0.1"
+            )
 
     @property
     def n_patches(self) -> int:
@@ -80,12 +89,12 @@ def _position_encoding(positions: Tensor, width: int) -> Tensor:
 
 
 def _sincos(n_positions: int, width: int) -> Tensor:
-    """忠实保留F0固定时间位置编码的计算及float32精度。"""
+    """Fixed float32 sinusoidal time encoding."""
     return _position_encoding(torch.arange(n_positions, dtype=torch.float32), width)
 
 
 class TransformerBlock(nn.Module):
-    """F0原始pre-LN块；名称、参数形状、eps与计算顺序保持一致。"""
+    """Pre-LayerNorm Transformer block using scaled dot-product attention."""
 
     def __init__(self, width: int, heads: int, mlp_ratio: float):
         super().__init__()
@@ -113,7 +122,7 @@ class TransformerBlock(nn.Module):
 
 
 class MAEEncoder(nn.Module):
-    """只定义纯MAE编码部分，不创建或导入旧诊断模块及预训练解码器。"""
+    """Encoder-only masked-autoencoder backbone."""
 
     def __init__(self, config: ModelConfig):
         super().__init__()
@@ -153,14 +162,16 @@ class MAEEncoder(nn.Module):
 
 
 def pack_four(x: Tensor) -> Tensor:
-    """仅重排连续4点，不抽样、池化或改变mV单位。"""
+    """Reshape consecutive groups of four samples without changing mV units."""
     if x.ndim != 3 or x.shape[-1] % 4:
-        raise ValueError("4点重排需要[B,L,T]且T是4的整数倍")
+        raise ValueError(
+            "Four-sample packing requires [B, L, T] with T divisible by four"
+        )
     return x.reshape(x.shape[0], x.shape[1], x.shape[2] // 4, 4)
 
 
 def supported_reference(reference: Tensor, support: Tensor) -> Tensor:
-    """参考始终停止梯度；无支持或无有效概率质量时只撤去关系提示。"""
+    """Detach references and suppress relation bias where support is invalid."""
     r = reference.detach().float()
     mass = r.sum(-1, keepdim=True)
     valid = (
@@ -181,7 +192,7 @@ def augment_reference(
     coefficient: Tensor,
     beta_max: float = 1.0,
 ) -> tuple[Tensor, Tensor, Tensor, float]:
-    """RMR^T追加至Q/K；保持原sqrt(d)缩放并给Value补零以对齐SDPA。"""
+    """Append reference-relation coordinates to Q/K for scaled attention."""
     dimension = q.shape[-1]
     r = posterior.detach().to(dtype=q.dtype)
     matrix = coefficient.tanh().to(dtype=q.dtype) * beta_max
@@ -230,7 +241,7 @@ class BoundedRelations(nn.Module):
 def local_indices(
     query_steps: int, source_steps: int, direction: str, ratio: int = 5
 ) -> tuple[Tensor, Tensor]:
-    """同导联真实坐标：粗格中心附近35细格，细格所在位置附近5粗格。"""
+    """Aligned same-lead neighborhoods: 35 fine cells or five coarse cells."""
     if direction == "coarse_to_fine":
         index = (
             torch.arange(query_steps)[:, None] * ratio
@@ -240,7 +251,7 @@ def local_indices(
     elif direction == "fine_to_coarse":
         index = torch.arange(query_steps)[:, None] // ratio + torch.arange(-2, 3)[None]
     else:
-        raise ValueError(f"未知局部交换方向：{direction}")
+        raise ValueError(f"Unknown local exchange direction: {direction}")
     valid = (index >= 0) & (index < source_steps)
     return index.clamp(0, source_steps - 1), valid
 
@@ -309,7 +320,7 @@ class FineResidual(nn.Module):
 
 
 class SameTimeLeadAttention(nn.Module):
-    """每个真实时刻单独处理导联轴，输出仍保留每条导联。"""
+    """Attend across leads independently at each time position."""
 
     def __init__(self, width: int, heads: int, residual: float = 0.1):
         super().__init__()
@@ -339,7 +350,7 @@ class FineWaveEncoder(nn.Module):
         self.lead_embed = nn.Parameter(
             torch.randn(1, config.n_leads, 1, config.fine_dim) * 0.02
         )
-        # 40ms为时间坐标单位；每个细格中心来自其原始样点坐标。
+        # Use 40 ms as the coordinate unit and retain original fine-cell centers.
         centers = (torch.arange(config.n_fine, dtype=torch.float32) * 4 + 1.5) / 20
         self.register_buffer("time_pos", _position_encoding(centers, config.fine_dim))
         self.local = nn.ModuleList(
@@ -405,11 +416,7 @@ def coverage_attention(
     scale_logits: Tensor,
     durations: tuple[float, float] | Tensor,
 ) -> Tensor:
-    """共享读取中加入log(pi)+log(dt/T)；共同T在softmax中严格相消。
-
-    两个尺度的偏置以额外Q/K坐标表示，不构建[B,H,71,18000]密集mask。
-    Value可含直接4点mV，扩维后仍以原始query头维度缩放。
-    """
+    """Add scale and sampling-duration biases without a dense attention mask."""
     dimension, value_dimension = q.shape[-1], v.shape[-1]
     duration = torch.as_tensor(durations, dtype=q.dtype, device=q.device)
     bias = scale_logits.to(q.dtype).log_softmax(-1) + duration.log()
@@ -441,7 +448,7 @@ class ReadoutRound(nn.Module):
 
 
 class JointLabelReader(nn.Module):
-    """两轮类别共享的跨注意力；原波可改变Key和Value，且直接mV保持FP32。"""
+    """Two-round class-query attention over features and raw voltages."""
 
     def __init__(self, config: ModelConfig):
         super().__init__()
@@ -526,8 +533,8 @@ class JointLabelReader(nn.Module):
             )
             query = query + layer.ffn(query)
             if index == 1:
-                # 同一轮、同一寻址的直接物理Value，绕过Value投影与最终内容LN。
-                # 单独FP32计算避免1.0001/1.0002mV之类差异被BF16先量化为相同值。
+                # Read raw-voltage values with the same attention weights.
+                # Use FP32 to preserve voltage differences lost by BF16 quantization.
                 with torch.autocast(device_type=h.device.type, enabled=False):
                     physical_values = torch.cat(
                         (
@@ -569,11 +576,7 @@ class JointMultiresClassifier(nn.Module):
         self.classifier_bias = nn.Parameter(torch.zeros(config.n_classes))
 
     def load_mae_state(self, state_dict: Mapping[str, Tensor]) -> dict:
-        """只接受完整纯MAE状态或其编码部分，忽略且报告decoder；拒绝诊断键。
-
-        先逐键验证再写入，防止不完整/错误状态造成部分encoder被覆盖。
-        文件SHA与F0来源由runtime负责，此处严格保证所给张量的逐位加载身份。
-        """
+        """Validate and load encoder weights, reporting unused decoder parameters."""
         expected = self.encoder.state_dict()
         missing = sorted(set(expected) - state_dict.keys())
         ignored = sorted(
@@ -584,7 +587,7 @@ class JointMultiresClassifier(nn.Module):
         unexpected = sorted(set(state_dict) - set(expected) - set(ignored))
         if missing or unexpected:
             raise ValueError(
-                f"MAE状态键不一致：missing={missing}, unexpected={unexpected}"
+                f"MAE state keys do not match: missing={missing}, unexpected={unexpected}"
             )
         for name, target in expected.items():
             source = state_dict[name]
@@ -593,7 +596,7 @@ class JointMultiresClassifier(nn.Module):
                 or source.shape != target.shape
                 or source.dtype != target.dtype
             ):
-                raise ValueError(f"MAE张量形状或dtype不一致：{name}")
+                raise ValueError(f"MAE tensor shape or dtype does not match: {name}")
         encoder_state = {name: state_dict[name] for name in expected}
         self.encoder.load_state_dict(encoder_state, strict=True)
         identical = all(
@@ -601,7 +604,7 @@ class JointMultiresClassifier(nn.Module):
             for name, value in self.encoder.state_dict().items()
         )
         if not identical:
-            raise RuntimeError("MAE加载后未保持逐张量身份")
+            raise RuntimeError("Loaded MAE tensors do not match the supplied state")
         return {
             "all_tensors_equal": identical,
             "loaded_tensor_count": len(expected),
@@ -619,7 +622,9 @@ class JointMultiresClassifier(nn.Module):
             or not torch.isfinite(prior).all()
             or ((prior < 0) | (prior > 1)).any()
         ):
-            raise ValueError("类别先验必须为每类一个有限的[0,1]TRAIN阳性率")
+            raise ValueError(
+                "Class priors must be finite training prevalences in [0, 1]"
+            )
         epsilon = torch.finfo(prior.dtype).eps
         self.classifier_bias.copy_(prior.clamp(epsilon, 1 - epsilon).logit())
 
@@ -635,12 +640,14 @@ class JointMultiresClassifier(nn.Module):
             or x.shape[1:] != (c.n_leads, c.seq_len)
             or x.dtype != torch.float32
         ):
-            raise ValueError(f"原波必须为float32 [B,{c.n_leads},{c.seq_len}] mV")
+            raise ValueError(
+                f"Waveforms must be float32 [B,{c.n_leads},{c.seq_len}] mV"
+            )
         expected_reference = (x.shape[0], c.n_leads, c.n_patches, 4)
         if reference.shape != expected_reference or reference.dtype != torch.float32:
-            raise ValueError("固定参考必须为float32 [B,L,K,4]")
+            raise ValueError("References must be float32 [B, L, K, 4]")
         if support.shape != expected_reference[:-1] or support.dtype != torch.bool:
-            raise ValueError("固定参考支持必须为bool [B,L,K]")
+            raise ValueError("Reference support must be bool [B, L, K]")
         r = supported_reference(reference, support).flatten(1, 2)
         u, raw = self.fine(x)
         h = self.encoder._embed(x)

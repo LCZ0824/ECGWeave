@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""P的汇聚前交互与谨慎吸收G的局部双端参考；基础模型独立快照只读。"""
+"""Feature-voltage interactions and gated local reference relations."""
 
 import math
 
@@ -14,7 +13,7 @@ ModelConfig = base.ModelConfig
 
 
 def local_time_basis(config):
-    """时间三角基：非负、L2归一，跨导联同步，最大非零距离小于1秒。"""
+    """Nonnegative L2-normalized temporal basis shared across leads."""
     step = 0.5
     seconds = (
         torch.arange(config.n_patches) * config.patch_size + (config.patch_size - 1) / 2
@@ -27,7 +26,7 @@ def local_time_basis(config):
 
 
 def augment_local_reference(q, k, v, reference, coefficient, gate, phi):
-    """精确追加 g_i g_j K_ij r_i^T M r_j；不构造逐对注意力mask。"""
+    """Append local reference relations without a pairwise attention mask."""
     dimension = q.shape[-1]
     r = reference.detach().to(q.dtype) * gate.to(q.dtype)
     matrix = coefficient.tanh().to(q.dtype)
@@ -48,7 +47,7 @@ def augment_local_reference(q, k, v, reference, coefficient, gate, phi):
 
 
 class LocalGatedRelations(base.BoundedRelations):
-    """门控学习任务中的参考使用方式，不解释为定界正确性概率。"""
+    """Learn task-dependent reference gates."""
 
     def __init__(self, config):
         super().__init__(config)
@@ -110,7 +109,7 @@ class InteractionReader(base.JointLabelReader):
             + self.fine_time.to(fine_keys.dtype)
         )
         keys = torch.cat((coarse_keys.flatten(1, 2), fine_keys.flatten(1, 2)), 1)
-        # s0=1mV，仅固定单位；不做每记录或每窗口幅值标准化。
+        # Use a fixed 1-mV unit without recordwise amplitude normalization.
         inputs = torch.cat((F.layer_norm(u, (c.fine_dim,)), raw), -1)
         fine_values = (
             self.fine_value(u) + self.raw_value(raw) + self.interaction(inputs)
@@ -169,7 +168,7 @@ class InteractionReader(base.JointLabelReader):
 class JointMultiresClassifier(base.JointMultiresClassifier):
     def __init__(self, config, arm="gpt_pro"):
         super().__init__(config)
-        # 在完整基础模型构造后添加新模块，保留同seed的所有共有初值。
+        # Add modules after constructing the shared backbone.
         self.arm = arm
         if arm == "gpt_pro":
             reader = InteractionReader(config)
@@ -183,7 +182,7 @@ class JointMultiresClassifier(base.JointMultiresClassifier):
                 }
                 or loaded.unexpected_keys
             ):
-                raise ValueError("P候选共有reader初值未完整保留")
+                raise ValueError("Shared reader initialization does not match")
             self.reader = reader
         elif arm == "gemini_local":
             relations = LocalGatedRelations(config)
@@ -191,4 +190,4 @@ class JointMultiresClassifier(base.JointMultiresClassifier):
                 relations.coefficients.copy_(self.relations.coefficients)
             self.relations = relations
         else:
-            raise ValueError(f"未知实验臂：{arm}")
+            raise ValueError(f"Unknown backbone variant: {arm}")

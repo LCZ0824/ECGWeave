@@ -1,5 +1,4 @@
-# 公开版适配说明：抽取原pseudo_ce；包内常量导入。
-"""固定教师伪标签损失；正式配置按全部有效点作分母。"""
+"""Pseudo-label loss for a fixed teacher."""
 
 import torch
 from torch.nn import functional as F
@@ -9,19 +8,19 @@ from . import base as FT
 def pseudo_ce(
     logits, targets, confidence, valid_mask, *, threshold, denominator, weights=None
 ):
-    """四类CE；valid分母包括未过阈值点；加权时分母为对应支持的权重和。"""
+    """Four-state CE; the valid denominator includes rejected pseudo-label positions."""
     if logits.ndim != 4 or logits.shape[1] != 4:
-        raise ValueError("logits形状须为[B,4,L,T]")
+        raise ValueError("logits must have shape [B, 4, L, T]")
     shape = logits.shape[:1] + logits.shape[2:]
     if any(t.shape != shape for t in (targets, confidence, valid_mask)):
-        raise ValueError("伪标签/置信度/支持形状须为[B,L,T]")
+        raise ValueError("targets, confidence, and support must have shape [B, L, T]")
     if targets.dtype != torch.long or valid_mask.dtype != torch.bool:
-        raise ValueError("targets须long且valid须bool")
+        raise ValueError("targets must be long and valid must be bool")
     if denominator not in ("valid", "accepted") or not 0 <= threshold <= 1:
-        raise ValueError("分母或阈值无效")
+        raise ValueError("Invalid denominator or confidence threshold")
     eligible = valid_mask & (targets != FT.IGNORE)
     if ((targets[eligible] < 0) | (targets[eligible] >= 4)).any():
-        raise ValueError("硬标签类别越界")
+        raise ValueError("Target class index is out of range")
     accepted = eligible & (confidence.detach() >= threshold)
     weights = torch.ones_like(confidence) if weights is None else weights.detach()
     if (
@@ -29,7 +28,7 @@ def pseudo_ce(
         or not torch.isfinite(weights).all()
         or (weights < 0).any()
     ):
-        raise ValueError("样点权重形状/值无效")
+        raise ValueError("Invalid sample-weight shape or values")
     support = eligible if denominator == "valid" else accepted
     normalizer = (weights * support).sum()
     safe_targets = torch.where(eligible, targets, 0)

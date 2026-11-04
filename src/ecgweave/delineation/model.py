@@ -1,5 +1,4 @@
-# 公开版适配说明：包内导入；工厂直接构造同结构，不隐式读取S*。
-"""保持已有Encoder与主预测路径的多深度/局部几何读出。"""
+"""Multidepth and local geometry refinement for delineation."""
 
 import torch
 from torch import nn
@@ -11,12 +10,12 @@ ARCHITECTURES = ("base", "multidepth", "derivative", "gls_local", "multidepth_gl
 
 
 def derivative_channels(x, *, seams=None):
-    """原波形及02式两阶差分；拼接±2点先去掉差分伪影再归一。"""
+    """Add first and second differences, masking a two-sample seam neighborhood."""
     x = x.float()
     guard = None
     if seams is not None:
         if seams.shape != x.shape or seams.dtype != torch.bool:
-            raise ValueError("拼接位置须为与逐导联波形相同形状的bool")
+            raise ValueError("seams must be bool with the same shape as the waveform")
         guard = F.max_pool1d(seams.float(), 5, 1, 2).bool()
     channels, current = [x], x
     for _ in range(2):
@@ -29,7 +28,7 @@ def derivative_channels(x, *, seams=None):
 
 
 class LocalGeometryBlock(nn.Module):
-    """02原始网格深度卷积＋LN/MLP残差；500Hz下匹配时间范围。"""
+    """Depthwise temporal convolution and LayerNorm/MLP residual refinement."""
 
     def __init__(self, channels=32):
         super().__init__()
@@ -46,11 +45,11 @@ class LocalGeometryBlock(nn.Module):
 
 
 class IntegratedSegmenter12(FT.Segmenter12):
-    """联合Encoder后逐导联共享局部读出，输出仍为[B,4,L,T]。"""
+    """Shared per-lead refinement after the joint encoder."""
 
     def __init__(self, base, architecture):
         if architecture not in ARCHITECTURES:
-            raise ValueError(f"未知结构：{architecture}")
+            raise ValueError(f"Unknown architecture: {architecture}")
         nn.Module.__init__(self)
         self.architecture = architecture
         self.patch_size = base.patch_size
@@ -59,7 +58,7 @@ class IntegratedSegmenter12(FT.Segmenter12):
         self.register_buffer("upsample", base.upsample.clone(), persistent=False)
         self.multidepth = architecture in ("multidepth", "multidepth_gls")
         self.geometry = architecture in ("gls_local", "multidepth_gls")
-        # 新分支不消费既有初始化/训练主随机流，所有旧模块已严格加载。
+        # Keep branch initialization independent of the shared random stream.
         with torch.random.fork_rng(devices=[]):
             torch.default_generator.manual_seed(230930)
             self.depth_projections = nn.ModuleDict()
@@ -144,7 +143,7 @@ class IntegratedSegmenter12(FT.Segmenter12):
 
 
 def build_segmenter(config=None, architecture="gls_local"):
-    """创建结构；检查点由调用者显式加载，不读取本地实验目录。"""
+    """Construct a delineator; load checkpoints explicitly."""
     from ..pretraining.core import ECGMAE, ModelConfig
 
     return IntegratedSegmenter12(

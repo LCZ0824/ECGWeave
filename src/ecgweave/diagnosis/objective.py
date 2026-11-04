@@ -1,5 +1,4 @@
-# 公开版适配说明：包内相对导入；不改计算。
-"""全71类均匀条件排序，保持记录级经验宏风险及精确呈现预算。"""
+"""Class-conditional sampling and ranking objectives."""
 
 import copy
 
@@ -11,7 +10,9 @@ from torch.nn import functional as F
 def rank_budget(records, passes, classes=8, per_side=4):
     total = records * passes
     if min(records, passes, classes, per_side) < 1 or total % (2 * per_side):
-        raise ValueError("记录预算必须容纳整数个完整正负类别批")
+        raise ValueError(
+            "Record budget must contain complete positive-negative class batches"
+        )
     complete, tail = divmod(total // (2 * per_side), classes)
     return [classes] * complete + ([tail] if tail else [])
 
@@ -26,11 +27,15 @@ class ConditionSampler:
             or len(np.unique(rows)) != len(rows)
             or not np.isin(target, [0, 1]).all()
         ):
-            raise ValueError("采样器要求完整71列、唯一TRAIN行和二元标签")
+            raise ValueError(
+                "Sampler requires 71 binary-label columns and unique training rows"
+            )
         self.positive = [rows[target[:, c] == 1] for c in range(71)]
         self.negative = [rows[target[:, c] == 0] for c in range(71)]
         if any(not len(pool) for pool in self.positive + self.negative):
-            raise ValueError("TRAIN每类均须存在正负记录")
+            raise ValueError(
+                "Each training class must contain positive and negative records"
+            )
 
     def draw(self, classes=8, per_side=4):
         tasks = self.rng.choice(71, classes, replace=False)
@@ -55,11 +60,7 @@ class ConditionSampler:
 
 
 def class_objective(logits, labels, task, scale, prevalence, per_side=4):
-    """返回平方hinge与逆采样概率校正后的完整71 BCE。
-
-    条件批正负各半，BCE按真实TRAIN主类阳性率还原总体记录权重，
-    以免将重采样后的标签共现分布误当作原总体分布。
-    """
+    """Return squared-hinge ranking loss and prevalence-corrected 71-label BCE."""
     if (
         logits.shape != (2 * per_side, 71)
         or labels.shape != logits.shape
@@ -67,7 +68,9 @@ def class_objective(logits, labels, task, scale, prevalence, per_side=4):
         or not 0 <= task < 71
         or not 0 < prevalence < 1
     ):
-        raise ValueError("条件排序要求同形完整71列、合法类别与阳性率")
+        raise ValueError(
+            "Conditional ranking requires matching 71-column inputs and valid class prevalence"
+        )
     scores = logits[:, task]
     margin = (scores[:per_side, None] - scores[None, per_side:]) / scale[task]
     rank = torch.relu(1 - margin).square().mean()

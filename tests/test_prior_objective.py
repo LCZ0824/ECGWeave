@@ -1,4 +1,4 @@
-"""混合采样、自然分布BCE与辅助目标的梯度和更新。"""
+"""Mixed sampling, weighted losses, and optimizer update tests."""
 
 import copy
 import math
@@ -139,7 +139,7 @@ def test_pair_gradient_has_correct_direction_bound_and_bias_invariance():
 def test_prior_auxiliary_and_natural_bce_share_the_posterior_optimum():
     module = implementation()
     prevalence = 0.2
-    # 正池两个形态的频率3:1，负池1:3；共享两项分数应为先验加对数似然比。
+    # Positive and negative pools have morphology ratios 3:1 and 1:3.
     scores = torch.tensor(
         [
             math.log(prevalence / (1 - prevalence)) + math.log(3),
@@ -224,7 +224,7 @@ def test_conditions_cannot_cross_microbatch_boundary():
     initial = copy.deepcopy(model.state_dict())
     batch = {"signals": torch.randn(24, 3), "labels": torch.zeros(24, 71)}
     condition = {"task": 3, "start": 12, "per_side": 4, "prevalence": 0.1}
-    with pytest.raises(ValueError, match="微批|跨"):
+    with pytest.raises(ValueError, match="microbatch|cross"):
         module.update(
             model,
             torch.optim.SGD(model.parameters(), lr=1),

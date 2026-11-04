@@ -1,4 +1,4 @@
-"""类别注意力的一阶与二阶统计读取。"""
+"""First- and second-moment class-query readout."""
 
 import torch
 from torch import nn
@@ -8,7 +8,7 @@ from .natural_reader import JointInteractionReader, split_heads
 
 
 def coverage_moments(q, key, value, types, scale_logits, durations):
-    """用同一SDPA汇聚一二阶矩；平方、汇聚和方差相减均使用FP32。"""
+    """Aggregate first and second moments with the same attention in FP32."""
     with torch.autocast(device_type=q.device.type, enabled=False):
         source = value.float()
         moments = base.coverage_attention(
@@ -25,7 +25,7 @@ def coverage_moments(q, key, value, types, scale_logits, durations):
 
 
 class StatsInteractionReader(JointInteractionReader):
-    """保留原内容记忆；以可学习残差加入类别注意力条件的离散度。"""
+    """Add attention-conditioned variance as a learned query residual."""
 
     def __init__(self, config):
         super().__init__(config)
@@ -35,7 +35,7 @@ class StatsInteractionReader(JointInteractionReader):
             self.variance_projection = nn.Linear(
                 config.readout_dim, config.readout_dim, bias=False
             )
-            # 仅这一处零输出初始化，不再叠加零门。
+            # Zero-initialize the projection without an additional gate.
             nn.init.zeros_(self.variance_projection.weight)
 
     def forward(self, h, u, raw):

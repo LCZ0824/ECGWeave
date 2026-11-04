@@ -1,4 +1,4 @@
-"""正式尺寸的合成前反向与资源检查，不更新参数、不读取患者数据。"""
+"""Forward and backward checks on synthetic full-size waveforms."""
 
 import argparse
 from contextlib import nullcontext
@@ -79,7 +79,9 @@ def main(argv=None):
             or not gradients
             or not all(torch.isfinite(g).all() for g in gradients)
         ):
-            raise RuntimeError(f"{name}前反向出现无效输出或梯度")
+            raise RuntimeError(
+                f"{name} forward or backward produced nonfinite outputs or gradients"
+            )
         if device.type == "cuda":
             torch.cuda.synchronize(device)
         report["components"][name] = {

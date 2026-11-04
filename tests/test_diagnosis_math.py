@@ -1,5 +1,4 @@
-# 公开版适配说明：替换导入；主管集成测试另由公开接口测试覆盖。
-"""新结构的数学、信息流与可独立加载合同；不访问患者数据。"""
+"""Attention, feature exchange, and gradient tests."""
 
 import math
 
