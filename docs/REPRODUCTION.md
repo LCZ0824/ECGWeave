@@ -1,62 +1,38 @@
-# 输入合同与复现范围
+# 使用说明
 
-## 预训练
-
-`ecgweave.pretraining.model.ValidECGMAE`保留最终F0的参数键，`core.ModelConfig`定义192维、12层、3头编码器与128维、2层逐导联解码器。有效支持以完整20点片段为单位；填充不参与可见输入、目标统计或重建损失。
+## 当前模型
 
 ```python
 import torch
-from ecgweave.pretraining.core import LossConfig, ModelConfig
-from ecgweave.pretraining.model import ValidECGMAE, make_valid_mask
+from ecgweave.diagnosis.stats_model import build_classifier
 
-torch.set_num_threads(2)
-model = ValidECGMAE(ModelConfig())
-signals = torch.randn(1, 12, 5000)  # 合成mV输入，仅示范接口
-valid = torch.ones(1, 250, dtype=torch.bool)
-mask = make_valid_mask(valid, 0.75, "limbsync_mixed")
-prediction = model(signals, mask, valid)
-loss = model.loss(prediction, signals, mask, LossConfig("local_softnorm"), valid)
-loss.backward()
-```
-
-原配置为九来源1,236,202条准入记录、batch32、100,000次更新。PTB-XL只准入其训练患者，其他来源的全局患者互斥性未建立。原患者身份与多来源波形组装缓存不公开，不能仅凭这段合成示例复现原F0。
-
-## 少标注定界
-
-`delineation.model.build_segmenter()`直接创建最终`gls_local`结构。无需原S*文件即可创建结构；复现训练则仍须按原配方先得到共同S*，固定教师后训练学生。编码器读取原始mV；局部分支使用逐导联标准化输入与两阶差分。
-
-`delineation.pattern_mix.mix_batches`保留原双向供体选择、支持和拼接位置。`delineation.loss.pseudo_ce`按0.95阈值筛选伪标签，正式配置使用`denominator="valid"`；双视图损失取均值。模式混合的U→L窗口平均置信度阈值为严格大于0.8，与逐点伪标签阈值分别定义。
-
-LUDB为120/40/40患者训练池、验证、内部测试；其中7人提供梯度标注，未标注流包括这7人在内的120人。另40人的验证标签用于选点。100轮、每轮60次更新，验证mIoU最高且并列最早；三个接续种子保持各自身份。
-
-## 多标签识别
-
-```python
-import torch
-from ecgweave.diagnosis.model import JointMultiresClassifier, ModelConfig
-
-model = JointMultiresClassifier(ModelConfig(), arm="wide_joint")
+model = build_classifier()  # 随机初始化
 batch = {
     "signals": torch.randn(1, 12, 5000),
     "reference": torch.full((1, 12, 250, 4), 0.25),
     "reference_support": torch.ones(1, 12, 250, dtype=torch.bool),
 }
-logits = model(batch)  # [1,71]；随机初始化，仅检查接口
-logits.square().mean().backward()
+logits = model(batch)  # [1, 71]
 ```
 
-最终分类器6,889,202参数，使用71类固定顺序。`objective.py`保留按类别条件采样、平方hinge排序、按TRAIN阳性率校正的完整71标签BCE及精确呈现预算。第一阶段为12轮BCE、6,540步；第二阶段为20遍记录呈现、5,444步。全部参数共同更新，固定定界器不接受梯度。学习率、分层衰减及其余设置见`configs/diagnosis.json`。
+`stats_prior20` 使用统计查询读取器和方差残差，不含额外导联注意力。分类器共6,639,486参数；每类128维，展平表征为9088维。`diagnosis/model.py`保留基础结构，当前模型请从 `stats_model.build_classifier` 创建。
 
-原PTB-XL为17,418/2,183/2,198条训练/验证/内部测试记录，对应15,023/1,942/1,904位患者。选点只使用完整Fold9宏AUROC，取最高且并列最早；最终单种子点为第9,262步。内部Fold10存在历史开发暴露，不是全新盲测或外部验证。这里不包含完整训练调度器、对照复现、临床统计分析脚本或患者缓存。
+诊断训练为单阶段20轮记录呈现、10,900次更新，目标为完整71标签BCE与固定训练先验辅助损失；实现见 `diagnosis/prior_objective.py`。最终权重按验证集宏AUROC选于第9轮、第4,905步。配置见 `configs/diagnosis.json`。
 
-## 原始波形到参考
+## 波形与软参考
 
-`pipeline.waveform_batch`由固定定界器输出逐点四态概率，完整20点片段取均值并归一；填充片段及整段常数导联无有效参考支持。原波形仍按原样进入分类器。可选`sample_support`为`bool[B,12,5000]`，仅表明真实采样支持。
+`pipeline.waveform_batch` 先将500Hz波形依次作五阶0.67Hz高通和40Hz低通零相位滤波，再输入冻结定界器。分类器始终接收原始mV。四态顺序为BG、P、QRS、T；逐点softmax后对连续20点平均，以float16量化，再恢复float32并归一化。无效片段和常数导联的支持为False。
 
-该入口使用FP32概率；历史批量导出曾含半精度存储与不同批量的数值路径。本次验证包括同输入同参考的分类器数值一致性、定界器数值一致性及合成前端合同，不将新入口视为已重复验证全部临床预测或原缓存逐字节身份。要精确回放原分类器输出，需使用对应的固定参考缓存、检查点和原计算精度。
+已有参考时，输入NPZ同时包含 `reference: float32[B,12,250,4]` 与 `reference_support: bool[B,12,250]`，可省略 `--delineator`。原波形可附 `sample_support: bool[B,12,5000]` 标记真实采样点。
 
-## 权重与验证
+CLI默认FP32；CUDA支持 `--precision bf16`，对应论文的BF16前向、FP32统计读取及logits。不同精度、批量和后端可能产生数值差异。`task_names71.json`固定类别顺序，其中包含诊断、形态及节律陈述，分数不直接作为临床结论。
 
-`docs/CHECKPOINTS.json`登记F0、S*、最终定界器及最终诊断器的SHA256。训练权重不随本次公开发布，访问安排联系通讯作者；没有公开下载的权重时，安装包只提供核心算法、结构及合成运行。
+## 其他阶段
 
-`pytest`测试只使用合成数据，核对有效支持、遮挡、双向混合、联合注意力、梯度及严格state_dict往返。`python -m ecgweave.smoke`检查正式尺寸下的结构、CPU/CUDA前反向与资源占用；结果仅是运行与接口验证，不是模型性能评估。
+- 预训练：`pretraining.model.ValidECGMAE`，同步肢体导联遮蔽和有效片段重建。
+- 定界：`delineation.model.build_segmenter`，`gls_local`结构；模式混合与伪标签损失在同目录。
+- 配置：`configs/`；运行检查：`python -m ecgweave.smoke --device cpu`，GPU改为 `cuda:0`。
+
+## 复现范围
+
+测试使用合成数据检查计算、梯度与接口，不代表性能复现。当前发布不含完整数据处理、患者划分、训练调度或临床分析流程。PTB-XL Fold10有历史开发暴露，不能作为全新盲测。权重身份见 [CHECKPOINTS.json](CHECKPOINTS.json)，权重文件尚未公开。

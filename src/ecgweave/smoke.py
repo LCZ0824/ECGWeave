@@ -8,7 +8,7 @@ import time
 
 import torch
 
-from .diagnosis.model import JointMultiresClassifier, ModelConfig as DiagnosisConfig
+from .diagnosis.stats_model import build_classifier
 from .delineation.model import build_segmenter
 from .pipeline import pool_reference
 from .pretraining.core import LossConfig, ModelConfig
@@ -41,7 +41,7 @@ def main(argv=None):
         model = {
             "pretraining": lambda: ValidECGMAE(ModelConfig()),
             "delineation": build_segmenter,
-            "diagnosis": lambda: JointMultiresClassifier(DiagnosisConfig()),
+            "diagnosis": lambda: build_classifier(),
         }[name]().to(device)
         autocast = (
             torch.autocast("cuda", dtype=torch.bfloat16)

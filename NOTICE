@@ -2,7 +2,7 @@ ECGWeave
 Copyright 2026 ECGWeave contributors.
 
 本公开版由原冻结科研实现按模块整理。修改包括包内导入、显式检查点路径、
-合成检查与命令行封装；未修改原模型的参数定义或核心前向计算。
+合成检查与命令行封装；当前诊断器对应stats_prior20冻结实现。
 
 项目训练框架与定界增强沿用或适配自VUNO SemiSegECG：
 https://github.com/vuno/semi-seg-ecg

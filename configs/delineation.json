@@ -15,18 +15,16 @@
   "epochs": 100,
   "updates_per_epoch": 60,
   "batch_records": 2,
-  "teacher": "fixed_S_star",
+  "teacher": "native500_S_star",
   "mixing": "bidirectional_pattern",
   "confidence_threshold": 0.95,
   "denominator": "valid",
   "u2l_confidence_threshold": 0.8,
   "warmup_epochs": 10,
   "seeds": [
-    0,
-    1,
-    2
+    0
   ],
-  "selection": "validation_mIoU_max;earliest_tie",
+  "selection": "validation_pooled_mIoU_max;earliest_tie;step0-and-every600-updates",
   "recipe": {
     "method": "v2_ecg",
     "epochs": 100,
@@ -43,5 +41,12 @@
     "denominator": "valid",
     "boundary_radius": 4
   },
-  "teacher_update": "none; original S* parameters and all buffers frozen"
+  "teacher_update": "none; original S* parameters and all buffers frozen",
+  "selected_seed": 0,
+  "preprocessing": {
+    "highpass_hz": 0.67,
+    "lowpass_hz": 40,
+    "butterworth_order": 5,
+    "mode": "sosfiltfilt; highpass then lowpass"
+  }
 }

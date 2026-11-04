@@ -103,5 +103,40 @@
     "original_sha256": "82212d026b6b7df3d60619b5602379ece12d091078634428b9fd6c15e7beb514",
     "adaptation": "包内相对导入；不改计算",
     "published_sha256": "5efb4f8faca5578ba76ee40347fba1dd9fcb3a094807c3794b7c9225de4e646e"
+  },
+  {
+    "published_file": "src/ecgweave/diagnosis/stats_reader.py",
+    "source": "工作区/review-stage/native500_performance_four_261028/diagnosis/performance_readers.py",
+    "original_sha256": "40e64b882fec6f4cf9303b3b875c5149a8f6d6a2ca8fdaa1fcab7d32acee9db1",
+    "adaptation": "抽取StatsInteractionReader与coverage_moments；包内导入",
+    "published_sha256": "8cf4b7c40e79bdf6d550db1614f021ff4baa92684351d95f67dc9a7722e7df21"
+  },
+  {
+    "published_file": "src/ecgweave/diagnosis/stats_model.py",
+    "source": "工作区/review-stage/native500_performance_four_261028/diagnosis/performance_model.py",
+    "original_sha256": "a54cf43921d62f4a8894ffdc73a815a472947a09dc183dc67eb44a09e8dedba5",
+    "adaptation": "只保留stats与关闭导联attention的正式结构；显式创建基础模型",
+    "published_sha256": "5331bac136b794831c7324653247651d820bb6be085426c3a7f92ba1363e0926"
+  },
+  {
+    "published_file": "src/ecgweave/diagnosis/prior_objective.py",
+    "source": "工作区/review-stage/native500_performance_four_261028/diagnosis/performance_objective.py",
+    "original_sha256": "64a7b69c0bbd7cb0bdecbff5c6cd887399357ccb3cb3f7300174eb2915c473a7",
+    "adaptation": "原文复制",
+    "published_sha256": "64a7b69c0bbd7cb0bdecbff5c6cd887399357ccb3cb3f7300174eb2915c473a7"
+  },
+  {
+    "published_file": "tests/test_stats_reader.py",
+    "source": "工作区/review-stage/native500_performance_four_261028/diagnosis/tests/test_performance_readers.py",
+    "original_sha256": "8fd93af088ff454d02f843cba1ab7586dca6ab2c793f6685afbcf246316d3f3c",
+    "adaptation": "保留统计读取器数学与梯度测试；包内导入",
+    "published_sha256": "bf517cf66425ff52c25ab065871324381a78e51311bc6436d2a071727a9f501b"
+  },
+  {
+    "published_file": "tests/test_prior_objective.py",
+    "source": "工作区/review-stage/native500_performance_four_261028/diagnosis/tests/test_performance_objective.py",
+    "original_sha256": "f4dc4e030849c8174e96070997888b7e97328c5ae4a1e6fe342d3e22dfe1ab8e",
+    "adaptation": "保留混合采样、损失与优化器更新测试；包内导入",
+    "published_sha256": "efcd247d55308c701b0228c4dd4679deea6d5808db26c3f8f6bde6c3a07fe2c0"
   }
 ]

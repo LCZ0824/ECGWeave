@@ -19,7 +19,10 @@ def main(argv=None):
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--batch-size", default=1, type=int)
+    parser.add_argument("--precision", choices=("fp32", "bf16"), default="fp32")
     args = parser.parse_args(argv)
+    if args.precision == "bf16" and torch.device(args.device).type != "cuda":
+        parser.error("--precision bf16仅用于CUDA")
     if args.batch_size < 1:
         parser.error("--batch-size须为正整数")
     if args.output.exists():
@@ -54,7 +57,14 @@ def main(argv=None):
         )
     delineator = load_delineator(args.delineator, args.device) if not cached else None
     outputs = []
-    with torch.inference_mode():
+    with (
+        torch.inference_mode(),
+        torch.autocast(
+            torch.device(args.device).type,
+            dtype=torch.bfloat16,
+            enabled=args.precision == "bf16",
+        ),
+    ):
         for start in range(0, len(signals), args.batch_size):
             rows = slice(start, start + args.batch_size)
             wave = signals[rows].to(args.device)
