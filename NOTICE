@@ -1,10 +1,8 @@
 ECGWeave
 Copyright 2026 ECGWeave contributors.
 
-Portions of the delineation implementation are adapted from VUNO SemiSegECG:
+Portions adapted from VUNO SemiSegECG, Copyright 2025 VUNO Inc.
 https://github.com/vuno/semi-seg-ecg
-Copyright 2025 VUNO Inc.
-Licensed under the Apache License, Version 2.0.
+Apache License, Version 2.0.
 
-Modifications include multilead waveform encoding, local refinement,
-pattern-guided mixing, and package interfaces.
+Modifications: multilead encoding, local refinement, pattern mixing, and interfaces.

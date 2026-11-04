@@ -1,17 +1,13 @@
 {
   "seed": 0,
-  "architecture": "ecg_gpt_pro_natural_261020",
+  "architecture": "ecgweave",
   "arm": "wide_joint",
   "candidate_model": {
     "fine_dim": 128,
     "exchange_dim": 128,
     "exchange_ffn": "channel",
     "ffn_expansion": 2,
-    "ffn_layers": [
-      4,
-      8,
-      12
-    ],
+    "ffn_layers": [4, 8, 12],
     "reader": "stats_interaction",
     "label_self_attention": false,
     "readout_precision": "global_AMP"
@@ -27,32 +23,25 @@
   "bce_warmup_updates": 545,
   "clip_norm": 5.0,
   "inference_batch_size": 16,
-  "checkpoint_interval": 128,
-  "progress_interval": 64,
   "lr_floor": 0.1,
   "optimizer": {
     "bce_encoder_lr": 3e-05,
     "bce_new_lr": 0.0003,
     "layer_decay": 0.75,
     "weight_decay": 0.05,
-    "betas": [
-      0.9,
-      0.999
-    ],
+    "betas": [0.9, 0.999],
     "eps": 1e-08
   },
   "selection": "full-fold9-all71-macro-AUROC-max;earliest-tie;AP-same-weights",
   "precision": "BF16-CUDA-autocast;FP32-parameters-loss-logits;TF32-off",
   "initialization": "pure-MAE-F0-only;fresh-diagnostic;no-linear-probe",
   "fixed_reference": true,
-  "test_read": false,
   "candidate": "stats_prior20",
   "structure": "performance_composite",
   "reader_kind": "stats",
   "lead_attention_off": true,
   "training_protocol": "single-continuous-optimizer-no-ranking-stage",
   "epoch_semantics": "record-presentations-half-uniform-half-class-conditional",
-  "calibration_complete": true,
   "objective": {
     "kind": "prior",
     "aux_coefficient": 0.029492154911704947,

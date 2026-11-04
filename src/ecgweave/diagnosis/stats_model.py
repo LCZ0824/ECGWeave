@@ -1,4 +1,4 @@
-"""ECGWeave classifier with attention-conditioned variance."""
+"""Multiscale ECG classifier with statistical query readout."""
 
 import torch
 from torch import nn

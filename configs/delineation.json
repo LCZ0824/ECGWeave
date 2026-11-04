@@ -1,11 +1,6 @@
 {
   "architecture": "gls_local",
-  "classes": [
-    "BG",
-    "P",
-    "QRS",
-    "T"
-  ],
+  "classes": ["BG", "P", "QRS", "T"],
   "sample_rate_hz": 500,
   "seq_len": 5000,
   "labeled_train_patients": 7,
@@ -21,9 +16,7 @@
   "denominator": "valid",
   "u2l_confidence_threshold": 0.8,
   "warmup_epochs": 10,
-  "seeds": [
-    0
-  ],
+  "seeds": [0],
   "selection": "validation_pooled_mIoU_max;earliest_tie;step0-and-every600-updates",
   "recipe": {
     "method": "v2_ecg",

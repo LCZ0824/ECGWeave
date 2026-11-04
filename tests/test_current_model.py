@@ -1,4 +1,4 @@
-"""Classifier identity, checkpoint loading, and preprocessing tests."""
+"""Model, checkpoint, and waveform preprocessing tests."""
 
 from dataclasses import asdict
 import math
